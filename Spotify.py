@@ -78,7 +78,7 @@ def create_playlist(user_id, playlist_name, access_token):
     }
     data = {
         "name": playlist_name,
-        "description": "Created using Spotify API",
+        "description": "Created using Spotify Playlist Generator",
         "public": True
     }
     response = requests.post(endpoint_url, headers=headers, json=data)
@@ -234,28 +234,28 @@ def setup_ui():
 if __name__ == "__main__":
     setup_ui()
 
-def main():
+def main_cli():
     code = get_auth_code()
     token_response = get_tokens(code)
     access_token = token_response['access_token']
-
     user_id = get_user_id(access_token)
-    playlist_name = 'My New Playlist'
+
+    # Take user input for theme
+    theme = input("Enter the theme for your playlist: ")
+    playlist_name = generate_playlist_name(theme)
     new_playlist_id = create_playlist(user_id, playlist_name, access_token)
 
     if not new_playlist_id:
         print("Failed to create new playlist")
         return
 
-    prompt = "i like Estonian Songs"
-    suggested_tracks = get_playlist_suggestions(prompt)
+    suggested_tracks = get_playlist_suggestions(theme)
     track_names = suggested_tracks.splitlines()
-
     track_uris = [search_spotify_track(track, access_token) for track in track_names if track]
-    track_uris = [uri for uri in track_uris if uri]
-    
+    track_uris = list(filter(None, track_uris))
+
     response = add_tracks_to_playlist(new_playlist_id, track_uris, access_token)
     print(response)
 
 if __name__ == "__main__":
-    main()
+    setup_ui()  # Call only the UI setup
