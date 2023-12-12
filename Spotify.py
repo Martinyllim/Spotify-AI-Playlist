@@ -25,14 +25,20 @@ CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
 # OpenAI API Key
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
+tracks_listbox = None
+new_prompt_entry = None
+playlist_id = None
 
 def get_auth_code():
+    
     auth_query_parameters = {
         "response_type": "code",
         "redirect_uri": REDIRECT_URI,
-        "scope": SCOPE,
+        "scope": SCOPE + " playlist-modify-private",  # Add additional scopes here
         "client_id": CLIENT_ID
     }
+    # ... rest of the function
+
     url_args = urlencode(auth_query_parameters)
     auth_url = f"{AUTH_URL}/?{url_args}"
     webbrowser.open(auth_url)
@@ -48,6 +54,7 @@ def get_auth_code():
     with socketserver.TCPServer(('', 8000), CallbackHandler) as httpd:
         httpd.handle_request()
         return httpd.auth_code
+    
 
 def get_tokens(code):
     token_data = {
@@ -71,6 +78,7 @@ def get_user_id(access_token):
     return response.json()['id']
 
 def create_playlist(user_id, playlist_name, access_token):
+    global playlist_id
     endpoint_url = f"https://api.spotify.com/v1/users/{user_id}/playlists"
     headers = {
         "Authorization": f"Bearer {access_token}",
@@ -104,8 +112,16 @@ def add_tracks_to_playlist(playlist_id, track_uris, access_token):
         print(f"Error: Received status code {response.status_code}")
         print("Response:", response.text)
         return None
+    
+    print(f"Track URIs being added: {track_uris}")  # Debug print
+    if not track_uris:
+        print("No track URIs to add to the playlist.")
+        return None  # Exit the function if there are no URIs to add
+
 
     return response.json()
+
+
 
 def get_playlist_suggestions(prompt):
     openai.api_key = OPENAI_API_KEY
@@ -118,6 +134,7 @@ def get_playlist_suggestions(prompt):
     return response.choices[0].text.strip()
 
 def search_spotify_track(track_name, access_token):
+    
     endpoint_url = f"https://api.spotify.com/v1/search"
     headers = {
         "Authorization": f"Bearer {access_token}"
@@ -138,6 +155,69 @@ def search_spotify_track(track_name, access_token):
         return None
     else:
         return tracks[0]['uri']
+    
+    if response.status_code != 200:
+        print(f"Error: Received status code {response.status_code}")
+        print("Response:", response.json())  # Print the actual response to debug
+        return None
+
+def get_playlist_tracks(playlist_id, access_token):
+    endpoint_url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
+    headers = {"Authorization": f"Bearer {access_token}"}
+    response = requests.get(endpoint_url, headers=headers)
+    if response.status_code != 200:
+        print(f"Error: Received status code {response.status_code}")
+        return []
+
+    tracks = response.json()['items']
+    return [(track['track']['name'], track['track']['artists'][0]['name']) for track in tracks]
+
+# Function to update the UI with playlist songs
+def update_playlist_display(playlist_id):
+    tracks = get_playlist_tracks(playlist_id, access_token)
+    tracks_listbox.delete(0, tk.END)  # Clear existing items
+    for track_name, artist_name in tracks:
+        tracks_listbox.insert(tk.END, f"{track_name} by {artist_name}")
+
+# Function to handle new song additions
+def on_add_songs_button_clicked():
+    global playlist_id  # Ensure you're using the global variable
+    new_prompt = new_prompt_entry.get()
+    suggested_tracks = get_playlist_suggestions(new_prompt)
+    track_names = suggested_tracks.splitlines()
+
+    track_uris = [search_spotify_track(track, access_token) for track in track_names if track]
+    track_uris = list(filter(None, track_uris))  # Filter out any None values before checking for emptiness
+
+    if not track_uris:
+        messagebox.showerror("Error", "No valid tracks found to add to the playlist")
+        return
+
+    response = add_tracks_to_playlist(playlist_id, track_uris, access_token)
+    if response:
+        update_playlist_display(playlist_id)
+        messagebox.showinfo("Success", "Tracks added successfully!")
+    else:
+        messagebox.showerror("Error", "Failed to add tracks to the playlist")
+    
+    new_prompt = new_prompt_entry.get()
+    suggested_tracks = get_playlist_suggestions(new_prompt)
+    track_names = suggested_tracks.splitlines()
+
+    track_uris = [search_spotify_track(track, access_token) for track in track_names if track]
+    track_uris = [uri for uri in track_uris if uri]
+
+    response = add_tracks_to_playlist(playlist_id, track_uris, access_token)
+    if response:
+        update_playlist_display(playlist_id)
+        
+        track_uris = list(filter(None, track_uris))  # Filter out any None values
+
+    if not track_uris:
+        messagebox.showerror("Error", "No valid tracks found to add to the playlist")
+        return
+
+    response = add_tracks_to_playlist(playlist_id, track_uris, access_token)
 
 def generate_playlist_name(theme):
     openai.api_key = OPENAI_API_KEY
@@ -153,6 +233,8 @@ def generate_playlist_name(theme):
 
 # Modify your main function
 def main():
+    global playlist_id, access_token
+
     code = get_auth_code()
     token_response = get_tokens(code)
     access_token = token_response['access_token']
@@ -169,8 +251,30 @@ def main():
     if not new_playlist_id:
         print("Failed to create new playlist")
         return
+    update_playlist_display(new_playlist_id)
+    
+    playlist_id = create_playlist(user_id, playlist_name, access_token)  # Set the global variable
+    if playlist_id:
+        update_playlist_display(playlist_id)  # Call to display playlist
+    else:
+        print("Failed to create new playlist")
+
 
 def on_generate_button_clicked():
+    global playlist_id  # Declare the variable as global
+    prompt = prompt_entry.get()
+
+    playlist_name = generate_playlist_name(prompt)
+    playlist_id = create_playlist(user_id, playlist_name, access_token)  # Update the global variable
+
+    if playlist_id:
+        playlist_name_label.config(text=f"Playlist Name: {playlist_name}")
+        update_playlist_display(playlist_id)
+        messagebox.showinfo("Success", "Playlist created successfully!")
+    else:
+        messagebox.showerror("Error", "Failed to create new playlist")
+
+    
     prompt = prompt_entry.get()  # Get the prompt from the input field
 
     # Generate playlist name and create playlist
@@ -199,6 +303,7 @@ def on_generate_button_clicked():
 
 # Main function to set up the UI
 def setup_ui():
+    global prompt_entry, new_prompt_entry, tracks_listbox, playlist_id, access_token, user_id
     global prompt_entry
     global playlist_name_label
     global user_id
@@ -226,6 +331,18 @@ def setup_ui():
     # Label to display the generated playlist name
     playlist_name_label = tk.Label(root, text="Playlist Name:")
     playlist_name_label.pack()
+
+    # Create a Listbox to display the playlist tracks
+    tracks_listbox = tk.Listbox(root, width=50)
+    tracks_listbox.pack()
+
+    # Create an input field and button for adding new songs
+    tk.Label(root, text="Enter prompt for new songs:").pack()
+    new_prompt_entry = tk.Entry(root, width=50)
+    new_prompt_entry.pack()
+
+    add_songs_button = tk.Button(root, text="Add Songs to Playlist", command=on_add_songs_button_clicked)
+    add_songs_button.pack()
 
     # Run the UI loop
     root.mainloop()
@@ -258,4 +375,4 @@ def main_cli():
     print(response)
 
 if __name__ == "__main__":
-    setup_ui()  # Call only the UI setup
+    setup_ui()  # or main_cli() based on your script usage
