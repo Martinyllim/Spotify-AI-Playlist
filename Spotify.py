@@ -30,7 +30,7 @@ new_prompt_entry = None
 playlist_id = None
 
 def get_auth_code():
-    
+
     auth_query_parameters = {
         "response_type": "code",
         "redirect_uri": REDIRECT_URI,
@@ -181,7 +181,8 @@ def update_playlist_display(playlist_id):
 
 # Function to handle new song additions
 def on_add_songs_button_clicked():
-    global playlist_id  # Ensure you're using the global variable
+    global playlist_id, access_token  # Ensure you're using the global variables
+
     new_prompt = new_prompt_entry.get()
     suggested_tracks = get_playlist_suggestions(new_prompt)
     track_names = suggested_tracks.splitlines()
@@ -261,9 +262,10 @@ def main():
 
 
 def on_generate_button_clicked():
-    global playlist_id  # Declare the variable as global
+    global playlist_id, access_token, user_id  # Declare the variables as global
     prompt = prompt_entry.get()
 
+    # Only generate the playlist name and create the playlist once
     playlist_name = generate_playlist_name(prompt)
     playlist_id = create_playlist(user_id, playlist_name, access_token)  # Update the global variable
 
