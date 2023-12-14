@@ -122,7 +122,6 @@ def add_tracks_to_playlist(playlist_id, track_uris, access_token):
     return response.json()
 
 
-
 def get_playlist_suggestions(prompt):
     openai.api_key = OPENAI_API_KEY
 
@@ -179,11 +178,54 @@ def update_playlist_display(playlist_id):
     for track_name, artist_name in tracks:
         tracks_listbox.insert(tk.END, f"{track_name} by {artist_name}")
 
-# Function to handle new song additions
-def on_add_songs_button_clicked():
-    global playlist_id, access_token  # Ensure you're using the global variables
+def generate_playlist_name(theme):
+    openai.api_key = OPENAI_API_KEY
 
+    prompt = f"Generate a creative playlist name for a playlist with songs about {theme}."
+    response = openai.Completion.create(
+        engine="text-davinci-003",
+        prompt=prompt,
+        max_tokens=100  # Adjust as needed
+    )
+    playlist_name = response.choices[0].text.strip()
+    return playlist_name
+
+def add_songs_to_playlist_and_update_display(playlist_id, prompt):
+    global access_token
+    suggested_tracks = get_playlist_suggestions(prompt)
+    track_names = suggested_tracks.splitlines()
+
+    track_uris = [search_spotify_track(track, access_token) for track in track_names if track]
+    track_uris = list(filter(None, track_uris))
+
+    if not track_uris:
+        messagebox.showerror("Error", "No valid tracks found to add to the playlist")
+        return
+
+    response = add_tracks_to_playlist(playlist_id, track_uris, access_token)
+    if response:
+        update_playlist_display(playlist_id)
+    else:
+        messagebox.showerror("Error", "Failed to add tracks to the playlist")
+
+def on_generate_button_clicked():
+    global playlist_id, access_token, user_id
+    prompt = prompt_entry.get()
+
+    playlist_name = generate_playlist_name(prompt)
+    playlist_id = create_playlist(user_id, playlist_name, access_token)
+
+    if playlist_id:
+        playlist_name_label.config(text=f"Playlist Name: {playlist_name}")
+        add_songs_to_playlist_and_update_display(playlist_id, prompt)
+        messagebox.showinfo("Success", "Playlist created successfully with initial songs!")
+    else:
+        messagebox.showerror("Error", "Failed to create new playlist")
+
+def on_add_songs_button_clicked():
+    global playlist_id
     new_prompt = new_prompt_entry.get()
+    add_songs_to_playlist_and_update_display(playlist_id, new_prompt)
     suggested_tracks = get_playlist_suggestions(new_prompt)
     track_names = suggested_tracks.splitlines()
 
@@ -219,89 +261,6 @@ def on_add_songs_button_clicked():
         return
 
     response = add_tracks_to_playlist(playlist_id, track_uris, access_token)
-
-def generate_playlist_name(theme):
-    openai.api_key = OPENAI_API_KEY
-
-    prompt = f"Generate a creative playlist name for a playlist with songs about {theme}."
-    response = openai.Completion.create(
-        engine="text-davinci-003",
-        prompt=prompt,
-        max_tokens=100  # Adjust as needed
-    )
-    playlist_name = response.choices[0].text.strip()
-    return playlist_name
-
-# Modify your main function
-def main():
-    global playlist_id, access_token
-
-    code = get_auth_code()
-    token_response = get_tokens(code)
-    access_token = token_response['access_token']
-
-    user_id = get_user_id(access_token)
-
-    # Use the new function to generate a playlist name based on a theme
-    theme = "Estonian songs"  # Or any other theme you'd like
-    playlist_name = generate_playlist_name(theme)
-
-    # Now create the playlist with the generated name
-    new_playlist_id = create_playlist(user_id, playlist_name, access_token)
-
-    if not new_playlist_id:
-        print("Failed to create new playlist")
-        return
-    update_playlist_display(new_playlist_id)
-    
-    playlist_id = create_playlist(user_id, playlist_name, access_token)  # Set the global variable
-    if playlist_id:
-        update_playlist_display(playlist_id)  # Call to display playlist
-    else:
-        print("Failed to create new playlist")
-
-
-def on_generate_button_clicked():
-    global playlist_id, access_token, user_id  # Declare the variables as global
-    prompt = prompt_entry.get()
-
-    # Only generate the playlist name and create the playlist once
-    playlist_name = generate_playlist_name(prompt)
-    playlist_id = create_playlist(user_id, playlist_name, access_token)  # Update the global variable
-
-    if playlist_id:
-        playlist_name_label.config(text=f"Playlist Name: {playlist_name}")
-        update_playlist_display(playlist_id)
-        messagebox.showinfo("Success", "Playlist created successfully!")
-    else:
-        messagebox.showerror("Error", "Failed to create new playlist")
-
-    
-    prompt = prompt_entry.get()  # Get the prompt from the input field
-
-    # Generate playlist name and create playlist
-    playlist_name = generate_playlist_name(prompt)
-    playlist_name_label.config(text=f"Playlist Name: {playlist_name}")
-    new_playlist_id = create_playlist(user_id, playlist_name, access_token)
-
-    if not new_playlist_id:
-        messagebox.showerror("Error", "Failed to create new playlist")
-        return
-
-    # Get playlist suggestions and add them to the playlist
-    suggested_tracks = get_playlist_suggestions(prompt)
-    track_names = suggested_tracks.splitlines()
-
-    track_uris = [search_spotify_track(track, access_token) for track in track_names if track]
-    track_uris = [uri for uri in track_uris if uri]
-
-    response = add_tracks_to_playlist(new_playlist_id, track_uris, access_token)
-
-    # Display success message or error
-    if response:
-        messagebox.showinfo("Success", "Playlist created successfully!")
-    else:
-        messagebox.showerror("Error", "Failed to add tracks to the playlist")
 
 # Main function to set up the UI
 def setup_ui():
