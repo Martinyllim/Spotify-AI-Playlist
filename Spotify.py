@@ -25,11 +25,16 @@ CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
 # OpenAI API Key
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
+# Global variable to hold the server reference
+http_server = None
+
 tracks_listbox = None
 new_prompt_entry = None
 playlist_id = None
 
 def get_auth_code():
+    global http_server
+    
 
     auth_query_parameters = {
         "response_type": "code",
@@ -51,9 +56,10 @@ def get_auth_code():
             self.wfile.write(b"<html><body><h1>You may now close this window.</h1></body></html>")
             self.server.auth_code = self.path.split('=')[1]
 
-    with socketserver.TCPServer(('', 8000), CallbackHandler) as httpd:
-        httpd.handle_request()
-        return httpd.auth_code
+    with socketserver.TCPServer(('', 8000), CallbackHandler) as server:
+        http_server = server  # Store the server reference globally
+        server.handle_request()
+        return server.auth_code
     
 
 def get_tokens(code):
@@ -264,6 +270,7 @@ def on_add_songs_button_clicked():
 
 # Main function to set up the UI
 def setup_ui():
+    global http_server
     global prompt_entry, new_prompt_entry, tracks_listbox, playlist_id, access_token, user_id
     global prompt_entry
     global playlist_name_label
@@ -304,6 +311,13 @@ def setup_ui():
 
     add_songs_button = tk.Button(root, text="Add Songs to Playlist", command=on_add_songs_button_clicked)
     add_songs_button.pack()
+
+    def on_closing():
+        if http_server:
+            http_server.shutdown()  # Shutdown the server
+        root.destroy()
+
+    root.protocol("WM_DELETE_WINDOW", on_closing)
 
     # Run the UI loop
     root.mainloop()
