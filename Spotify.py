@@ -215,7 +215,7 @@ def generate_playlist_name(theme):
     )
 
     # Extract the playlist name from the response
-    playlist_name = response["choices"][0]["message"]["content"].strip()
+    playlist_name = response["choices"][0]["message"]["content"].strip().strip('"')
 
     # Check if the playlist name is appropriate
     if not playlist_name or playlist_name.lower() == "stop":
