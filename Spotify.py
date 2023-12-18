@@ -205,13 +205,7 @@ def update_playlist_display(playlist_id):
 
 def generate_playlist_name(theme):
     openai.api_key = OPENAI_API_KEY
-    system_msg = """I want you to act like a music playlist creator, I give you a hint on what playlist I want.
-
-Rules you need to know:  
-- When answering the question, the answer *must* be in square brackets, for example "['music1','music2','music3']"
-- You only create music playlists and nothing else, so any false request other than playlists and music should be answered *I create music playlists* and it should be returned as *string*
-- When creating music playlists, look for criteria such as music genre, language, artist name, etc. *if you know them*. If it does not meet most of these criteria and you are *not sure*, please do not include the music in the list
-- Return your request response with only *music name* in the array."""
+    system_msg = "Create a name for a playlist with the prompt given"
     user_msg = theme
 
     response = openai.ChatCompletion.create(
@@ -219,7 +213,15 @@ Rules you need to know:
     messages=[{"role": "system", "content": system_msg}, 
               {"role": "user", "content": user_msg}]
     )
-    playlist_name = response["choices"][0]["finish_reason"]
+
+    # Extract the playlist name from the response
+    playlist_name = response["choices"][0]["message"]["content"].strip()
+
+    # Check if the playlist name is appropriate
+    if not playlist_name or playlist_name.lower() == "stop":
+        # Generate a default playlist name if the response is not appropriate
+        playlist_name = f"Playlist based on {theme}"
+
     return playlist_name
 
 def add_songs_to_playlist_and_update_display(playlist_id, prompt):
