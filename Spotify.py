@@ -81,6 +81,7 @@ def get_user_id(access_token):
         "Authorization": f"Bearer {access_token}"
     }
     response = requests.get("https://api.spotify.com/v1/me", headers=headers)
+    #return "x28twcy7acjq6rsnh2jiypug0" #Ingmar Hack
     return response.json()['id']
 
 def create_playlist(user_id, playlist_name, access_token):
@@ -130,12 +131,15 @@ def add_tracks_to_playlist(playlist_id, track_uris, access_token):
 
 def get_playlist_suggestions(prompt):
     openai.api_key = OPENAI_API_KEY
+    print(f'[MUSIC PROMPT] {prompt}')
 
     response = openai.Completion.create(
         engine="text-davinci-003",
         prompt=prompt,
         max_tokens=100
     )
+    #print(f'[MUSIC RESPONSE] {response}')
+    print(f'[MUSIC RESPONSE FORMATED] {response.choices[0].text.strip()}')
     return response.choices[0].text.strip()
 
 def search_spotify_track(track_name, access_token):
@@ -149,6 +153,7 @@ def search_spotify_track(track_name, access_token):
         "type": "track",
         "limit": 1
     }
+    print(f"[SPORIFTY SEARCH QUERY]: {track_name}")
     response = requests.get(endpoint_url, headers=headers, params=params)
     if response.status_code != 200:
         print(f"Error: Received status code {response.status_code}")
@@ -159,7 +164,9 @@ def search_spotify_track(track_name, access_token):
     if not tracks:
         return None
     else:
+        print(f"[SPORIFTY SEARCH RESPONSE]: {tracks[0]['name']}")
         return tracks[0]['uri']
+    
     
     if response.status_code != 200:
         print(f"Error: Received status code {response.status_code}")
@@ -188,18 +195,21 @@ def generate_playlist_name(theme):
     openai.api_key = OPENAI_API_KEY
 
     prompt = f"Generate a creative playlist name for a playlist with songs about {theme}."
+    print(f'[PLAYLIST NAME PROMPT] {prompt}')
     response = openai.Completion.create(
         engine="text-davinci-003",
         prompt=prompt,
         max_tokens=100  # Adjust as needed
     )
     playlist_name = response.choices[0].text.strip()
+    print(f'[PLAYLIST NAME RESPONSE] {playlist_name}')
     return playlist_name
 
 def add_songs_to_playlist_and_update_display(playlist_id, prompt):
     global access_token
     suggested_tracks = get_playlist_suggestions(prompt)
     track_names = suggested_tracks.splitlines()
+    print(f"[TRACK NAMES] {track_names}")
 
     track_uris = [search_spotify_track(track, access_token) for track in track_names if track]
     track_uris = list(filter(None, track_uris))
