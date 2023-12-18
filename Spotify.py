@@ -80,6 +80,7 @@ def get_user_id(access_token):
         "Authorization": f"Bearer {access_token}"
     }
     response = requests.get("https://api.spotify.com/v1/me", headers=headers)
+    #return "x28twcy7acjq6rsnh2jiypug0" #Ingmar Hack
     return response.json()['id']
 
 def create_playlist(user_id, playlist_name, access_token):
@@ -129,7 +130,11 @@ def add_tracks_to_playlist(playlist_id, track_uris, access_token):
 
 def get_playlist_suggestions(theme):
     openai.api_key = OPENAI_API_KEY
+<<<<<<< HEAD
     system_msg = """I want you to act like a music playlist creator, I give you a hint on what playlist I want.
+=======
+    print(f'[MUSIC PROMPT] {prompt}')
+>>>>>>> ed18246ff752bf40ae0348f2d5afdcb5257a2061
 
 Rules you need to know:  
 - When answering the question, the answer *must* be in square brackets, for example "['music1','music2','music3']"
@@ -143,6 +148,7 @@ Rules you need to know:
     messages=[{"role": "system", "content": system_msg}, 
               {"role": "user", "content": user_msg}]
     )
+<<<<<<< HEAD
     print(f'[DEBUG RESPONSE]: {response}')
 
     response_string = response["choices"][0]["message"]["content"]
@@ -152,6 +158,11 @@ Rules you need to know:
     print(f'[DEBUG response_array]: {response_array}')
 
     return response_array
+=======
+    #print(f'[MUSIC RESPONSE] {response}')
+    print(f'[MUSIC RESPONSE FORMATED] {response.choices[0].text.strip()}')
+    return response.choices[0].text.strip()
+>>>>>>> ed18246ff752bf40ae0348f2d5afdcb5257a2061
 
 def search_spotify_track(track_name, access_token):
     
@@ -164,6 +175,7 @@ def search_spotify_track(track_name, access_token):
         "type": "track",
         "limit": 1
     }
+    print(f"[SPORIFTY SEARCH QUERY]: {track_name}")
     response = requests.get(endpoint_url, headers=headers, params=params)
     if response.status_code != 200:
         print(f"Error: Received status code {response.status_code}")
@@ -174,7 +186,9 @@ def search_spotify_track(track_name, access_token):
     if not tracks:
         return None
     else:
+        print(f"[SPORIFTY SEARCH RESPONSE]: {tracks[0]['name']}")
         return tracks[0]['uri']
+    
     
     if response.status_code != 200:
         print(f"Error: Received status code {response.status_code}")
@@ -203,6 +217,7 @@ def generate_playlist_name(theme):
     openai.api_key = OPENAI_API_KEY
     system_msg = """I want you to act like a music playlist creator, I give you a hint on what playlist I want.
 
+<<<<<<< HEAD
 Rules you need to know:  
 - When answering the question, the answer *must* be in square brackets, for example "['music1','music2','music3']"
 - You only create music playlists and nothing else, so any false request other than playlists and music should be answered *I create music playlists* and it should be returned as *string*
@@ -216,11 +231,28 @@ Rules you need to know:
               {"role": "user", "content": user_msg}]
     )
     playlist_name = response["choices"][0]["finish_reason"]
+=======
+    prompt = f"Generate a creative playlist name for a playlist with songs about {theme}."
+    print(f'[PLAYLIST NAME PROMPT] {prompt}')
+    response = openai.Completion.create(
+        engine="text-davinci-003",
+        prompt=prompt,
+        max_tokens=100  # Adjust as needed
+    )
+    playlist_name = response.choices[0].text.strip()
+    print(f'[PLAYLIST NAME RESPONSE] {playlist_name}')
+>>>>>>> ed18246ff752bf40ae0348f2d5afdcb5257a2061
     return playlist_name
 
 def add_songs_to_playlist_and_update_display(playlist_id, prompt):
     global access_token
+<<<<<<< HEAD
     track_names = get_playlist_suggestions(prompt)
+=======
+    suggested_tracks = get_playlist_suggestions(prompt)
+    track_names = suggested_tracks.splitlines()
+    print(f"[TRACK NAMES] {track_names}")
+>>>>>>> ed18246ff752bf40ae0348f2d5afdcb5257a2061
 
     track_uris = [search_spotify_track(track, access_token) for track in track_names if track]
     track_uris = list(filter(None, track_uris))
