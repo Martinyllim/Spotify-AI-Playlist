@@ -42,7 +42,6 @@ def get_auth_code():
         "scope": SCOPE + " playlist-modify-private",  # Add additional scopes here
         "client_id": CLIENT_ID
     }
-    # ... rest of the function
 
     url_args = urlencode(auth_query_parameters)
     auth_url = f"{AUTH_URL}/?{url_args}"
@@ -128,15 +127,31 @@ def add_tracks_to_playlist(playlist_id, track_uris, access_token):
     return response.json()
 
 
-def get_playlist_suggestions(prompt):
+def get_playlist_suggestions(theme):
     openai.api_key = OPENAI_API_KEY
+    system_msg = """I want you to act like a music playlist creator, I give you a hint on what playlist I want.
 
-    response = openai.Completion.create(
-        engine="text-davinci-003",
-        prompt=prompt,
-        max_tokens=100
+Rules you need to know:  
+- When answering the question, the answer *must* be in square brackets, for example "['music1','music2','music3']"
+- You only create music playlists and nothing else, so any false request other than playlists and music should be answered *I create music playlists* and it should be returned as *string*
+- When creating music playlists, look for criteria such as music genre, language, artist name, etc. *if you know them*. If it does not meet most of these criteria and you are *not sure*, please do not include the music in the list
+- Return your request response with only *music name* in the array."""
+    user_msg = theme
+
+    response = openai.ChatCompletion.create(
+    model="gpt-3.5-turbo-1106",  # Update with the correct GPT-3.5 model name
+    messages=[{"role": "system", "content": system_msg}, 
+              {"role": "user", "content": user_msg}]
     )
-    return response.choices[0].text.strip()
+    print(f'[DEBUG RESPONSE]: {response}')
+
+    response_string = response["choices"][0]["message"]["content"]
+    print(f'[DEBUG response_string]: {response_string}')
+
+    response_array = json.loads(response_string.replace("'", '"'))
+    print(f'[DEBUG response_array]: {response_array}')
+
+    return response_array
 
 def search_spotify_track(track_name, access_token):
     
@@ -186,20 +201,26 @@ def update_playlist_display(playlist_id):
 
 def generate_playlist_name(theme):
     openai.api_key = OPENAI_API_KEY
+    system_msg = """I want you to act like a music playlist creator, I give you a hint on what playlist I want.
 
-    prompt = f"Generate a creative playlist name for a playlist with songs about {theme}."
-    response = openai.Completion.create(
-        engine="text-davinci-003",
-        prompt=prompt,
-        max_tokens=100  # Adjust as needed
+Rules you need to know:  
+- When answering the question, the answer *must* be in square brackets, for example "['music1','music2','music3']"
+- You only create music playlists and nothing else, so any false request other than playlists and music should be answered *I create music playlists* and it should be returned as *string*
+- When creating music playlists, look for criteria such as music genre, language, artist name, etc. *if you know them*. If it does not meet most of these criteria and you are *not sure*, please do not include the music in the list
+- Return your request response with only *music name* in the array."""
+    user_msg = theme
+
+    response = openai.ChatCompletion.create(
+    model="gpt-3.5-turbo-1106",  # Update with the correct GPT-3.5 model name
+    messages=[{"role": "system", "content": system_msg}, 
+              {"role": "user", "content": user_msg}]
     )
-    playlist_name = response.choices[0].text.strip()
+    playlist_name = response["choices"][0]["finish_reason"]
     return playlist_name
 
 def add_songs_to_playlist_and_update_display(playlist_id, prompt):
     global access_token
-    suggested_tracks = get_playlist_suggestions(prompt)
-    track_names = suggested_tracks.splitlines()
+    track_names = get_playlist_suggestions(prompt)
 
     track_uris = [search_spotify_track(track, access_token) for track in track_names if track]
     track_uris = list(filter(None, track_uris))
@@ -216,17 +237,27 @@ def add_songs_to_playlist_and_update_display(playlist_id, prompt):
 
 def on_generate_button_clicked():
     global playlist_id, access_token, user_id
-    prompt = prompt_entry.get()
+    # Retrieve user input from the prompt_entry
+    user_theme = prompt_entry.get()
 
-    playlist_name = generate_playlist_name(prompt)
-    playlist_id = create_playlist(user_id, playlist_name, access_token)
+    # Check if the input is not empty
+    if not user_theme.strip():
+        messagebox.showerror("Error", "Please enter a theme for the playlist.")
+        return
 
-    if playlist_id:
-        playlist_name_label.config(text=f"Playlist Name: {playlist_name}")
-        add_songs_to_playlist_and_update_display(playlist_id, prompt)
-        messagebox.showinfo("Success", "Playlist created successfully with initial songs!")
+    # Pass the user input to the function to generate the playlist name
+    playlist_name = generate_playlist_name(user_theme)
+    if playlist_name:
+        playlist_id = create_playlist(user_id, playlist_name, access_token)
+
+        if playlist_id:
+            playlist_name_label.config(text=f"Playlist Name: {playlist_name}")
+            add_songs_to_playlist_and_update_display(playlist_id, user_theme)
+            messagebox.showinfo("Success", "Playlist created successfully with initial songs!")
+        else:
+            messagebox.showerror("Error", "Failed to create new playlist")
     else:
-        messagebox.showerror("Error", "Failed to create new playlist")
+        messagebox.showerror("Error", "Failed to generate playlist name.")
 
 def on_add_songs_button_clicked():
     global playlist_id
